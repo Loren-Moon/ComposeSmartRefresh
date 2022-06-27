@@ -1,0 +1,133 @@
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+Properties localProperties = new Properties()
+// 合并local.properties
+localProperties.load(project.rootProject.file('local.properties').newDataInputStream())
+localProperties.each { name, value -> project.ext[name] = value }
+
+Map<String, String> projectProperties = new HashMap<>()
+// 合并project.ext
+projectProperties.putAll(project.ext.getProperties())
+// 合并rootProject.ext
+rootProject.ext.getProperties().each { name, value -> if (!projectProperties.containsKey(name)) projectProperties.put(name, value) }
+//println(properties)
+def mavenUsername = localProperties.getProperty("sonatype.username")
+def mavenPassword = localProperties.getProperty("sonatype.password")
+def projectGroupId = projectProperties.get('groupId')
+def projectArtifactId = project.getName()
+def projectVersionName = projectProperties.getOrDefault('version', project.extensions.findByName("android")["defaultConfig"].versionName)
+def projectDescription = projectProperties.get('description')
+def projectGitUrl = projectProperties.get('gitUrl')
+def projectLicense = projectProperties.get('license')
+def projectLicenseUrl = projectLicense ? "https://opensource.org/licenses/${projectLicense.toString().replace(" ", "-")} " : null
+
+def developerAuthorId = mavenUsername
+def developerAuthorName = mavenUsername
+def developerAuthorEmail = projectProperties.get('authorEmail')
+
+println("${mavenUsername} ${mavenPassword} - ${projectGroupId}:${projectArtifactId}:${projectVersionName}")
+println("${projectLicense} - ${projectLicenseUrl}")
+
+if (!projectGroupId || !projectArtifactId || !projectVersionName) {
+    println("${project.name} 缺少项目信息")
+    return
+}
+if (!mavenUsername || !mavenPassword || !localProperties.containsKey("signing.keyId") || !localProperties.containsKey("signing.password") || !localProperties.containsKey("signing.secretKeyRingFile")) {
+    println("${project.name} 缺少认证信息")
+    return
+}
+if (!projectDescription || !projectGitUrl || !projectLicense || !projectLicenseUrl || !developerAuthorId || !developerAuthorName || !developerAuthorEmail) {
+    println("${project.name} 缺少项目描述信息")
+}
+
+android {
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+//            withJavadocJar()
+        }
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            aar(MavenPublication) {
+                from components.release
+
+                groupId = projectGroupId
+                artifactId = projectArtifactId
+                version = projectVersionName
+
+                pom {
+                    name = projectArtifactId
+                    description = projectDescription
+                    // If your project has a dedicated site, use its URL here
+                    url = projectGitUrl
+                    if (projectLicense) {
+                        licenses {
+                            license {
+                                name = projectLicense
+                                url = projectLicenseUrl
+                            }
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = developerAuthorId
+                            name = developerAuthorName
+                            email = developerAuthorEmail
+                        }
+                    }
+                    // Version control info, if you're using GitHub, follow the format as seen here
+                    scm {
+                        connection = "scm:git:${projectGitUrl}"
+                        developerConnection = "scm:git:${projectGitUrl}"
+                        url = projectGitUrl
+                    }
+                    withXml { xmlProvider ->
+                        def node = xmlProvider.asNode()
+                        def getAt = node.getAt('dependencies')
+                        def dependenciesNode
+                        if (getAt == null) {
+                            dependenciesNode = node.appendNode('dependencies')
+                        } else {
+                            dependenciesNode = getAt[0]
+                        }
+                        configurations.api.allDependencies.each { dependency ->
+                            if (!dependency.hasProperty('dependencyProject')) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', dependency.group)
+                                dependencyNode.appendNode('artifactId', dependency.name)
+                                dependencyNode.appendNode('version', dependency.version)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        repositories {
+            maven {
+                name = projectArtifactId
+
+                def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+                def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+                // You only need this if you want to publish snapshots, otherwise just set the URL
+                // to the release repo directly
+                url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+
+                // The username and password we've fetched earlier
+                credentials {
+                    username mavenUsername
+                    password mavenPassword
+                }
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications
+}

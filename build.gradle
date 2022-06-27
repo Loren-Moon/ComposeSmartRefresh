@@ -5,6 +5,16 @@ plugins {
     id 'org.jetbrains.kotlin.android' version '1.6.10' apply false
 }
 
+ext {
+    versionCode = 1
+    version = "1.0.0"
+    groupId = "io.github.loren-moon"
+    description = "Smartrefreshlayout based on compose"
+    gitUrl = "https://github.com/Loren-Moon/ComposeSmartRefresh.git"
+    authorEmail = "loren_moon@163.com"
+    license = "MIT"
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
