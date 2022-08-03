@@ -1,6 +1,7 @@
 package com.loren.component.view.sample
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.annotation.DrawableRes
@@ -149,27 +150,26 @@ class MainViewModel : ViewModel() {
     private var flag = true // 模拟成功失败
     fun fillData(isRefresh: Boolean) {
         viewModelScope.launch {
-            delay(2000)
-            if (isRefresh) {
-                if (flag) {
-                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = true, data = topics.toMutableList().apply {
+            runCatching {
+                delay(1000)
+                if (isRefresh) {
+                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = flag, data = topics.toMutableList().apply {
                         this[0] = this[0].copy(title = System.currentTimeMillis().toString())
                     })
-                } else {
-                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = false)
-                }
 
-            } else {
-                if (flag) {
-                    _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = true, data = _mainUiState.value?.data?.toMutableList()?.apply {
-                        addAll(topics)
-                    } ?: emptyList())
                 } else {
-                    _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = false)
+                    _mainUiState.value =
+                        _mainUiState.value?.copy(loadMoreSuccess = flag, data = _mainUiState.value?.data?.toMutableList()?.apply {
+                            this[this.size - 1] = this[this.size - 1].copy(title = System.currentTimeMillis().toString())
+                        } ?: emptyList())
                 }
-
+                flag = !flag
+            }.onSuccess {
+                Log.v("Loren", "fillData success")
+            }.onFailure {
+                Log.v("Loren", "fillData error = ${it.message}")
             }
-            flag = !flag
+
         }
     }
 }
