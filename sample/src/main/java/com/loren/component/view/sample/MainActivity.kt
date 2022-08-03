@@ -65,15 +65,17 @@ class MainActivity : AppCompatActivity() {
                 }
                 LaunchedEffect(mainUiState.value) {
                     mainUiState.value?.let {
-                        refreshState.refreshFlag = when (it.refreshSuccess) {
-                            true -> SmartSwipeStateFlag.SUCCESS
-                            false -> SmartSwipeStateFlag.ERROR
-                            else -> SmartSwipeStateFlag.IDLE
-                        }
-                        refreshState.loadMoreFlag = when (it.loadMoreSuccess) {
-                            true -> SmartSwipeStateFlag.SUCCESS
-                            false -> SmartSwipeStateFlag.ERROR
-                            else -> SmartSwipeStateFlag.IDLE
+                        if (!it.isLoading) {
+                            refreshState.refreshFlag = when (it.refreshSuccess) {
+                                true -> SmartSwipeStateFlag.SUCCESS
+                                false -> SmartSwipeStateFlag.ERROR
+                                else -> SmartSwipeStateFlag.IDLE
+                            }
+                            refreshState.loadMoreFlag = when (it.loadMoreSuccess) {
+                                true -> SmartSwipeStateFlag.SUCCESS
+                                false -> SmartSwipeStateFlag.ERROR
+                                else -> SmartSwipeStateFlag.IDLE
+                            }
                         }
                     }
                 }
@@ -151,23 +153,37 @@ class MainViewModel : ViewModel() {
     fun fillData(isRefresh: Boolean) {
         viewModelScope.launch {
             runCatching {
+                _mainUiState.value = _mainUiState.value?.copy(isLoading = true)
                 delay(1000)
                 if (isRefresh) {
-                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = flag, data = topics.toMutableList().apply {
-                        this[0] = this[0].copy(title = System.currentTimeMillis().toString())
-                    })
+                    if (flag) {
+                        _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = true, data = topics.toMutableList().apply {
+                            this[0] = this[0].copy(title = System.currentTimeMillis().toString())
+                        }, isLoading = false)
+                    } else {
+                        _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = false, isLoading = false)
+                    }
 
                 } else {
-                    _mainUiState.value =
-                        _mainUiState.value?.copy(loadMoreSuccess = flag, data = _mainUiState.value?.data?.toMutableList()?.apply {
-                            this[this.size - 1] = this[this.size - 1].copy(title = System.currentTimeMillis().toString())
-                        } ?: emptyList())
+                    if (flag) {
+                        _mainUiState.value =
+                            _mainUiState.value?.copy(loadMoreSuccess = true, data = _mainUiState.value?.data?.toMutableList()?.apply {
+                                addAll(topics)
+                            } ?: emptyList(), isLoading = false)
+                    } else {
+                        _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = false, isLoading = false)
+                    }
                 }
                 flag = !flag
             }.onSuccess {
                 Log.v("Loren", "fillData success")
             }.onFailure {
                 Log.v("Loren", "fillData error = ${it.message}")
+                if (isRefresh) {
+                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = false, isLoading = false)
+                } else {
+                    _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = false, isLoading = false)
+                }
             }
 
         }
@@ -181,6 +197,7 @@ data class TopicModel(
 )
 
 data class MainUiState(
+    val isLoading: Boolean = false,
     val refreshSuccess: Boolean? = null,
     val loadMoreSuccess: Boolean? = null,
     val data: List<TopicModel>
