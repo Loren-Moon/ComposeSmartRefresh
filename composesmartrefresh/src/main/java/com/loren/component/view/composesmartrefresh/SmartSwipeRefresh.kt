@@ -37,7 +37,6 @@ import java.util.*
 @Composable
 fun SmartSwipeRefresh(
     modifier: Modifier = Modifier,
-    backgroundColor: Color = Color.Transparent,
     onRefresh: (suspend () -> Unit)? = null,
     onLoadMore: (suspend () -> Unit)? = null,
     state: SmartSwipeRefreshState,
@@ -94,7 +93,7 @@ fun SmartSwipeRefresh(
             else -> {}
         }
     }
-    Surface(modifier = Modifier.zIndex(-1f), color = backgroundColor) {
+    Box(modifier = modifier.zIndex(-1f)) {
         SubComposeSmartSwipeRefresh(
             headerIndicator = headerIndicator,
             footerIndicator = footerIndicator,
