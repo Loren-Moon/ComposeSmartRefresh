@@ -288,9 +288,13 @@ private class SmartSwipeRefreshNestedScrollConnection(
                 state.animateToOffset(-footerHeight)
                 state.loadMoreFlag = SmartSwipeStateFlag.REFRESHING
             } else {
-                if (state.indicatorOffset != 0.dp)
+                if (state.indicatorOffset != 0.dp) {
                     state.animateToOffset(0.dp)
+                } else {
+                    return super.onPreFling(available)
+                }
             }
+            return Velocity(available.x, available.y)
         }
         return super.onPreFling(available)
     }
