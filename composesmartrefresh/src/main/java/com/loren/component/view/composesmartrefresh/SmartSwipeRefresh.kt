@@ -1,5 +1,6 @@
 package com.loren.component.view.composesmartrefresh
 
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.MutatorMutex
@@ -100,6 +101,7 @@ fun SmartSwipeRefresh(
             isNeedRefresh,
             isNeedLoadMore
         ) { header, footer ->
+            Log.v("Loren", "header = $header  footer = $footer")
             val smartSwipeRefreshNestedScrollConnection = remember(state, header, footer) {
                 SmartSwipeRefreshNestedScrollConnection(state, header, footer)
             }
@@ -281,10 +283,10 @@ private class SmartSwipeRefreshNestedScrollConnection(
      */
     override suspend fun onPreFling(available: Velocity): Velocity {
         if (!state.isRefreshing()) {
-            if (state.indicatorOffset >= headerHeight) {
+            if (state.indicatorOffset > headerHeight) {
                 state.animateToOffset(headerHeight)
                 state.refreshFlag = SmartSwipeStateFlag.REFRESHING
-            } else if (state.indicatorOffset <= -footerHeight) {
+            } else if (state.indicatorOffset < -footerHeight) {
                 state.animateToOffset(-footerHeight)
                 state.loadMoreFlag = SmartSwipeStateFlag.REFRESHING
             } else {
