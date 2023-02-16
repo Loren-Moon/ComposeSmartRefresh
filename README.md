@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation "io.github.loren-moon:composesmartrefresh:1.1.0"
+    implementation "io.github.loren-moon:composesmartrefresh:1.2.0"
 }
 ```
 
