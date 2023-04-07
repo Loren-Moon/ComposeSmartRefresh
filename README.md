@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation "io.github.loren-moon:composesmartrefresh:1.2.0"
+    implementation "io.github.loren-moon:composesmartrefresh:1.2.1"
 }
 ```
 
@@ -38,6 +38,6 @@ SmartSwipeRefresh(
 
 ## :camera_flash: Screenshots
 
-<img src="/snapshot/refresh_success.gif" width="260">|<img src="/snapshot/refresh_error.gif" width="260">
----|---
-<img src="/snapshot/load_success.gif" width="260">|<img src="/snapshot/load_error.gif" width="260">
+| <img src="/snapshot/refresh_success.gif" width="260"> | <img src="/snapshot/refresh_error.gif" width="260"> |
+|-------------------------------------------------------|-----------------------------------------------------|
+| <img src="/snapshot/load_success.gif" width="260">    | <img src="/snapshot/load_error.gif" width="260">    |

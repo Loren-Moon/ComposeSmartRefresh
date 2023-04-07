@@ -6,8 +6,8 @@ plugins {
 }
 
 ext {
-    versionCode = 3
-    version = "1.2.0"
+    versionCode = 4
+    version = "1.2.1"
     groupId = "io.github.loren-moon"
     description = "Smartrefreshlayout based on compose"
     gitUrl = "https://github.com/Loren-Moon/ComposeSmartRefresh.git"

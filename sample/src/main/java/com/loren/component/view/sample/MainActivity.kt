@@ -41,69 +41,80 @@ class MainActivity : AppCompatActivity() {
             val viewModel by viewModels<MainViewModel>()
             val mainUiState = viewModel.mainUiState.observeAsState()
             val refreshState = rememberSmartSwipeRefreshState()
-            SmartSwipeRefresh(
-                onRefresh = {
-                    viewModel.fillData(true)
-                },
-                onLoadMore = {
-                    viewModel.fillData(false)
-                },
-                state = refreshState,
-                isNeedRefresh = true,
-                isNeedLoadMore = true,
-                headerIndicator = {
-                    MyRefreshHeader(refreshState.refreshFlag, true)
-                },
-                footerIndicator = {
-                    MyRefreshFooter(refreshState.loadMoreFlag, true)
-                }) {
-
-                LaunchedEffect(refreshState.smartSwipeRefreshAnimateFinishing) {
-                    if (refreshState.smartSwipeRefreshAnimateFinishing.isFinishing && !refreshState.smartSwipeRefreshAnimateFinishing.isRefresh) {
-                        scrollState.animateScrollToItem(scrollState.firstVisibleItemIndex + 1)
-                    }
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "我是标题")
                 }
-                LaunchedEffect(mainUiState.value) {
-                    mainUiState.value?.let {
-                        if (!it.isLoading) {
-                            refreshState.refreshFlag = when (it.refreshSuccess) {
-                                true -> SmartSwipeStateFlag.SUCCESS
-                                false -> SmartSwipeStateFlag.ERROR
-                                else -> SmartSwipeStateFlag.IDLE
-                            }
-                            refreshState.loadMoreFlag = when (it.loadMoreSuccess) {
-                                true -> SmartSwipeStateFlag.SUCCESS
-                                false -> SmartSwipeStateFlag.ERROR
-                                else -> SmartSwipeStateFlag.IDLE
+
+                SmartSwipeRefresh(
+                    onRefresh = {
+                        viewModel.fillData(true)
+                    },
+                    onLoadMore = {
+                        viewModel.fillData(false)
+                    },
+                    state = refreshState,
+                    isNeedRefresh = true,
+                    isNeedLoadMore = true,
+                    headerIndicator = {
+                        MyRefreshHeader(refreshState.refreshFlag, true)
+                    },
+                    footerIndicator = {
+                        MyRefreshFooter(refreshState.loadMoreFlag, true)
+                    }) {
+
+                    LaunchedEffect(refreshState.smartSwipeRefreshAnimateFinishing) {
+                        if (refreshState.smartSwipeRefreshAnimateFinishing.isFinishing && !refreshState.smartSwipeRefreshAnimateFinishing.isRefresh) {
+                            scrollState.animateScrollToItem(scrollState.firstVisibleItemIndex + 1)
+                        }
+                    }
+                    LaunchedEffect(mainUiState.value) {
+                        mainUiState.value?.let {
+                            if (!it.isLoading) {
+                                refreshState.refreshFlag = when (it.refreshSuccess) {
+                                    true -> SmartSwipeStateFlag.SUCCESS
+                                    false -> SmartSwipeStateFlag.ERROR
+                                    else -> SmartSwipeStateFlag.IDLE
+                                }
+                                refreshState.loadMoreFlag = when (it.loadMoreSuccess) {
+                                    true -> SmartSwipeStateFlag.SUCCESS
+                                    false -> SmartSwipeStateFlag.ERROR
+                                    else -> SmartSwipeStateFlag.IDLE
+                                }
                             }
                         }
                     }
-                }
 
-                CompositionLocalProvider(LocalOverScrollConfiguration.provides(null)) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = scrollState
-                    ) {
-                        mainUiState.value?.data?.let {
-                            itemsIndexed(it) { index, item ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentHeight()
-                                        .background(if (index % 2 == 0) Color.LightGray else Color.White)
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Image(
+                    CompositionLocalProvider(LocalOverScrollConfiguration.provides(null)) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            state = scrollState
+                        ) {
+                            mainUiState.value?.data?.let {
+                                itemsIndexed(it) { index, item ->
+                                    Row(
                                         modifier = Modifier
-                                            .width(32.dp)
-                                            .height(32.dp),
-                                        painter = painterResource(id = item.icon),
-                                        contentDescription = null
-                                    )
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Text(text = item.title)
+                                            .fillMaxWidth()
+                                            .wrapContentHeight()
+                                            .background(if (index % 2 == 0) Color.LightGray else Color.White)
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Image(
+                                            modifier = Modifier
+                                                .width(32.dp)
+                                                .height(32.dp),
+                                            painter = painterResource(id = item.icon),
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Text(text = item.title)
+                                    }
                                 }
                             }
                         }
