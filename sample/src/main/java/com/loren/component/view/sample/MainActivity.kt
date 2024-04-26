@@ -8,26 +8,40 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.LocalOverScrollConfiguration
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.loren.component.view.composesmartrefresh.*
+import com.loren.component.view.composesmartrefresh.FlingScrollStrategy
+import com.loren.component.view.composesmartrefresh.MyRefreshFooter
+import com.loren.component.view.composesmartrefresh.MyRefreshHeader
+import com.loren.component.view.composesmartrefresh.SmartSwipeRefresh
+import com.loren.component.view.composesmartrefresh.SmartSwipeStateFlag
+import com.loren.component.view.composesmartrefresh.rememberSmartSwipeRefreshState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -41,17 +55,16 @@ class MainActivity : AppCompatActivity() {
             val viewModel by viewModels<MainViewModel>()
             val mainUiState = viewModel.mainUiState.observeAsState()
             val refreshState = rememberSmartSwipeRefreshState()
+            // 快速滚动头尾允许的阈值
+            with(LocalDensity.current) {
+                refreshState.flingHeaderIndicatorStrategy = FlingScrollStrategy.Hide
+//                refreshState.flingHeaderIndicatorStrategy = FlingScrollStrategy.Show(80.dp.toPx())
+                refreshState.flingFooterIndicatorStrategy = FlingScrollStrategy.Show(80.dp.toPx())
+            }
+            refreshState.needFirstRefresh = true
             Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "我是标题")
-                }
-
                 SmartSwipeRefresh(
+                    modifier = Modifier.fillMaxSize(),
                     onRefresh = {
                         viewModel.fillData(true)
                     },
@@ -59,49 +72,43 @@ class MainActivity : AppCompatActivity() {
                         viewModel.fillData(false)
                     },
                     state = refreshState,
-                    isNeedRefresh = true,
-                    isNeedLoadMore = true,
                     headerIndicator = {
                         MyRefreshHeader(refreshState.refreshFlag, true)
                     },
                     footerIndicator = {
                         MyRefreshFooter(refreshState.loadMoreFlag, true)
-                    }) {
+                    },
+                    contentScrollState = scrollState
+                ) {
 
-                    LaunchedEffect(refreshState.smartSwipeRefreshAnimateFinishing) {
-                        if (refreshState.smartSwipeRefreshAnimateFinishing.isFinishing && !refreshState.smartSwipeRefreshAnimateFinishing.isRefresh) {
-                            scrollState.animateScrollToItem(scrollState.firstVisibleItemIndex + 1)
-                        }
-                    }
                     LaunchedEffect(mainUiState.value) {
                         mainUiState.value?.let {
-                            if (!it.isLoading) {
-                                refreshState.refreshFlag = when (it.refreshSuccess) {
+                            if (it.isLoadMore) {
+                                refreshState.loadMoreFlag = when (it.flag) {
                                     true -> SmartSwipeStateFlag.SUCCESS
                                     false -> SmartSwipeStateFlag.ERROR
-                                    else -> SmartSwipeStateFlag.IDLE
                                 }
-                                refreshState.loadMoreFlag = when (it.loadMoreSuccess) {
+                            } else {
+                                refreshState.refreshFlag = when (it.flag) {
                                     true -> SmartSwipeStateFlag.SUCCESS
                                     false -> SmartSwipeStateFlag.ERROR
-                                    else -> SmartSwipeStateFlag.IDLE
                                 }
                             }
                         }
                     }
 
-                    CompositionLocalProvider(LocalOverScrollConfiguration.provides(null)) {
+                    CompositionLocalProvider(LocalOverscrollConfiguration.provides(null)) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             state = scrollState
                         ) {
                             mainUiState.value?.data?.let {
-                                itemsIndexed(it) { index, item ->
+                                items(it) { item ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .wrapContentHeight()
-                                            .background(if (index % 2 == 0) Color.LightGray else Color.White)
+                                            .background(Color.LightGray)
                                             .padding(16.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -127,7 +134,7 @@ class MainActivity : AppCompatActivity() {
 
 class MainViewModel : ViewModel() {
 
-    private val _mainUiState = MutableLiveData<MainUiState>()
+    private val _mainUiState: MutableLiveData<MainUiState> = MutableLiveData()
     val mainUiState: LiveData<MainUiState>
         get() = _mainUiState
 
@@ -156,47 +163,33 @@ class MainViewModel : ViewModel() {
         TopicModel("Social sciences", RandomIcon.icon())
     )
 
-    init {
-        _mainUiState.value = MainUiState(data = topics)
-    }
-
     private var flag = true // 模拟成功失败
     fun fillData(isRefresh: Boolean) {
         viewModelScope.launch {
             runCatching {
-                _mainUiState.value = _mainUiState.value?.copy(isLoading = true)
-                delay(1000)
-                if (isRefresh) {
-                    if (flag) {
-                        _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = true, data = topics.toMutableList().apply {
-                            this[0] = this[0].copy(title = System.currentTimeMillis().toString())
-                        }, isLoading = false)
-                    } else {
-                        _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = false, isLoading = false)
-                    }
-
-                } else {
-                    if (flag) {
-                        _mainUiState.value =
-                            _mainUiState.value?.copy(loadMoreSuccess = true, data = _mainUiState.value?.data?.toMutableList()?.apply {
-                                addAll(topics)
-                            } ?: emptyList(), isLoading = false)
-                    } else {
-                        _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = false, isLoading = false)
-                    }
+                delay(2000)
+                if (!flag) {
+                    throw Exception("error")
                 }
-                flag = !flag
+                if (isRefresh) {
+                    MainUiState(isLoadMore = false, data = topics.toMutableList().apply {
+                        this[0] = this[0].copy(title = System.currentTimeMillis().toString())
+                    }, flag = true)
+                } else {
+                    MainUiState(
+                        isLoadMore = true,
+                        data = (_mainUiState.value?.data ?: mutableListOf()).apply {
+                            addAll(topics)
+                        }, flag = true
+                    )
+                }
             }.onSuccess {
                 Log.v("Loren", "fillData success")
+                _mainUiState.value = it
             }.onFailure {
-                Log.v("Loren", "fillData error = ${it.message}")
-                if (isRefresh) {
-                    _mainUiState.value = _mainUiState.value?.copy(refreshSuccess = false, isLoading = false)
-                } else {
-                    _mainUiState.value = _mainUiState.value?.copy(loadMoreSuccess = false, isLoading = false)
-                }
+                _mainUiState.value = _mainUiState.value?.copy(isLoadMore = !isRefresh, flag = false)
             }
-
+            flag = !flag
         }
     }
 }
@@ -208,8 +201,7 @@ data class TopicModel(
 )
 
 data class MainUiState(
-    val isLoading: Boolean = false,
-    val refreshSuccess: Boolean? = null,
-    val loadMoreSuccess: Boolean? = null,
-    val data: List<TopicModel>
+    val data: MutableList<TopicModel>? = null,
+    val isLoadMore: Boolean = false,
+    val flag: Boolean = true
 )
