@@ -36,7 +36,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.loren.component.view.composesmartrefresh.FlingScrollStrategy
+import com.loren.component.view.composesmartrefresh.ThresholdScrollStrategy
 import com.loren.component.view.composesmartrefresh.MyRefreshFooter
 import com.loren.component.view.composesmartrefresh.MyRefreshHeader
 import com.loren.component.view.composesmartrefresh.SmartSwipeRefresh
@@ -57,9 +57,10 @@ class MainActivity : AppCompatActivity() {
             val refreshState = rememberSmartSwipeRefreshState()
             // 快速滚动头尾允许的阈值
             with(LocalDensity.current) {
-                refreshState.flingHeaderIndicatorStrategy = FlingScrollStrategy.Hide
-//                refreshState.flingHeaderIndicatorStrategy = FlingScrollStrategy.Show(80.dp.toPx())
-                refreshState.flingFooterIndicatorStrategy = FlingScrollStrategy.Show(80.dp.toPx())
+                refreshState.dragHeaderIndicatorStrategy = ThresholdScrollStrategy.UnLimited
+                refreshState.dragFooterIndicatorStrategy = ThresholdScrollStrategy.Fixed(160.dp.toPx())
+                refreshState.flingHeaderIndicatorStrategy = ThresholdScrollStrategy.None
+                refreshState.flingFooterIndicatorStrategy = ThresholdScrollStrategy.Fixed(80.dp.toPx())
             }
             refreshState.needFirstRefresh = true
             Column {

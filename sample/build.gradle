@@ -4,6 +4,8 @@ plugins {
 }
 
 android {
+    namespace = "com.loren.component.view.sample"
+
     compileSdk 34
 
     defaultConfig {

@@ -5,6 +5,8 @@ plugins {
 apply from: '../publish.gradle'
 
 android {
+    namespace = "com.loren.component.view.composesmartrefresh"
+
     compileSdk 34
 
     defaultConfig {

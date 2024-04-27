@@ -57,10 +57,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.absoluteValue
 
 /**
  * Created by Loren on 2022/6/13
  * Description -> 支持下拉刷新&加载更多的通用组件
+ * [state] 刷新以及加载的状态
+ * [onRefresh] 刷新的回调
+ * [onLoadMore] 加载更多的回调
+ * [headerIndicator] 头布局
+ * [footerIndicator] 尾布局
+ * [contentScrollState] 当内容布局可滚动时，传入该布局的滚动状态，可以控制滚动，加载更多成功时仅隐藏尾布局，新内容直接显示
+ * [content] 内容布局
  */
 @Composable
 fun SmartSwipeRefresh(
@@ -165,10 +173,18 @@ enum class SmartSwipeStateFlag {
     IDLE, REFRESHING, SUCCESS, ERROR, TIPS_DOWN, TIPS_RELEASE
 }
 
-sealed interface FlingScrollStrategy {
-    data object Hide : FlingScrollStrategy
+/**
+ * 边界阈值策略
+ * [ThresholdScrollStrategy.None] 阈值为0
+ * [ThresholdScrollStrategy.UnLimited] 阈值为任意
+ * [ThresholdScrollStrategy.Fixed] 阈值为固定数值
+ */
+sealed interface ThresholdScrollStrategy {
+    data object None : ThresholdScrollStrategy
 
-    data class Show(val height: Float) : FlingScrollStrategy
+    data object UnLimited : ThresholdScrollStrategy
+
+    data class Fixed(val height: Float) : ThresholdScrollStrategy
 }
 
 @Composable
@@ -179,47 +195,72 @@ fun rememberSmartSwipeRefreshState(): SmartSwipeRefreshState {
 }
 
 class SmartSwipeRefreshState {
-    //
+    /**
+     * 拖动粘性
+     */
     var stickinessLevel = 0.5f
 
-    // fling strategy of Indicator
-    var flingHeaderIndicatorStrategy: FlingScrollStrategy = FlingScrollStrategy.Hide
-    var flingFooterIndicatorStrategy: FlingScrollStrategy = FlingScrollStrategy.Hide
+    /**
+     * 头布局拖拽策略
+     */
+    var dragHeaderIndicatorStrategy: ThresholdScrollStrategy = ThresholdScrollStrategy.UnLimited
 
-    // enter page call refresh
+    /**
+     * 尾布局拖拽策略
+     */
+    var dragFooterIndicatorStrategy: ThresholdScrollStrategy = ThresholdScrollStrategy.UnLimited
+
+    /**
+     * 头布局快速滑动策略
+     */
+    var flingHeaderIndicatorStrategy: ThresholdScrollStrategy = ThresholdScrollStrategy.None
+
+    /**
+     * 尾布局快速滑动策略
+     */
+    var flingFooterIndicatorStrategy: ThresholdScrollStrategy = ThresholdScrollStrategy.None
+
+    /**
+     * 首次进入页面是否触发刷新动画以及回调
+     */
     var needFirstRefresh = false
 
-    fun flingIndicatorHeight(strategy: FlingScrollStrategy): Float = when (strategy) {
-        FlingScrollStrategy.Hide -> 0f
-        is FlingScrollStrategy.Show -> strategy.height
-    }
-
-    suspend fun initRefresh() {
-        snapOffsetTo(headerHeight)
-        refreshFlag = SmartSwipeStateFlag.REFRESHING
-    }
-
+    /**
+     * 头布局测量高度
+     */
     var headerHeight = 0f
+
+    /**
+     * 尾布局测量高度
+     */
     var footerHeight = 0f
+
+    /**
+     * 是否开启刷新
+     */
+    var enableRefresh = true
+
+    /**
+     * 是否开启加载更多
+     */
+    var enableLoadMore = true
 
     // fling释放的时候header|footer是否有显示 显示则刷新 没显示动画回到原位
     var releaseIsEdge = false
-
     var refreshFlag by mutableStateOf(SmartSwipeStateFlag.IDLE)
     var loadMoreFlag by mutableStateOf(SmartSwipeStateFlag.IDLE)
 
-    var enableRefresh = true
-    var enableLoadMore = true
-
+    /**
+     * 动画结束
+     */
     var animateIsOver by mutableStateOf(true)
-
-    fun isLoading() = !animateIsOver || refreshFlag == SmartSwipeStateFlag.REFRESHING || loadMoreFlag == SmartSwipeStateFlag.REFRESHING
-
     private val _indicatorOffset = Animatable(0f)
     private val mutatorMutex = MutatorMutex()
 
     val indicatorOffset: Float
         get() = _indicatorOffset.value
+
+    fun isLoading() = !animateIsOver || refreshFlag == SmartSwipeStateFlag.REFRESHING || loadMoreFlag == SmartSwipeStateFlag.REFRESHING
 
     suspend fun animateOffsetTo(offset: Float) {
         mutatorMutex.mutate {
@@ -249,6 +290,17 @@ class SmartSwipeRefreshState {
             }
         }
     }
+
+    suspend fun initRefresh() {
+        snapOffsetTo(headerHeight)
+        refreshFlag = SmartSwipeStateFlag.REFRESHING
+    }
+
+    fun strategyIndicatorHeight(strategy: ThresholdScrollStrategy): Float = when (strategy) {
+        ThresholdScrollStrategy.None -> 0f
+        is ThresholdScrollStrategy.Fixed -> strategy.height
+        else -> Float.MAX_VALUE
+    }
 }
 
 private class SmartSwipeRefreshNestedScrollConnection(
@@ -256,9 +308,17 @@ private class SmartSwipeRefreshNestedScrollConnection(
 ) : NestedScrollConnection {
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
         return when {
-            state.indicatorOffset != 0f -> {
-                // header||footer is show
-                scroll(available, source)
+            state.isLoading() -> Offset.Zero
+            available.y < 0 && state.indicatorOffset > 0 -> {
+                // header can drag [state.indicatorOffset, 0]
+                val canConsumed = (available.y * state.stickinessLevel).coerceAtLeast(0 - state.indicatorOffset)
+                scroll(canConsumed)
+            }
+
+            available.y > 0 && state.indicatorOffset < 0 -> {
+                // footer can drag [state.indicatorOffset, 0]
+                val canConsumed = (available.y * state.stickinessLevel).coerceAtMost(0 - state.indicatorOffset)
+                scroll(canConsumed)
             }
 
             else -> Offset.Zero
@@ -266,52 +326,39 @@ private class SmartSwipeRefreshNestedScrollConnection(
     }
 
     override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-        return scroll(available, source)
-    }
-
-    private fun scroll(available: Offset, source: NestedScrollSource): Offset {
-        val headerIsShow = state.indicatorOffset > 0
-        val footerIsShow = state.indicatorOffset < 0
-        val canConsumed = when {
-
-            state.isLoading() -> {
-                return Offset.Zero
-            }
-
-            available.y < 0 && headerIsShow -> {
-                // header can drag [state.indicatorOffset, 0]
-                (available.y * state.stickinessLevel).coerceAtLeast(0 - state.indicatorOffset)
-            }
-
-            available.y > 0 && footerIsShow -> {
-                // footer can drag [state.indicatorOffset, 0]
-                (available.y * state.stickinessLevel).coerceAtMost(0 - state.indicatorOffset)
-            }
-
+        return when {
+            state.isLoading() -> Offset.Zero
             available.y > 0 && state.enableRefresh && state.headerHeight != 0f -> {
-                if (source == NestedScrollSource.Fling) {
-                    (available.y * state.stickinessLevel).coerceAtMost(state.flingIndicatorHeight(state.flingHeaderIndicatorStrategy) - state.indicatorOffset)
+                val canConsumed = if (source == NestedScrollSource.Fling) {
+                    (available.y * state.stickinessLevel).coerceAtMost(state.strategyIndicatorHeight(state.flingHeaderIndicatorStrategy) - state.indicatorOffset)
                 } else {
-                    // header can drag any range
-                    available.y * state.stickinessLevel
+                    (available.y * state.stickinessLevel).coerceAtMost(state.strategyIndicatorHeight(state.dragHeaderIndicatorStrategy) - state.indicatorOffset)
                 }
+                scroll(canConsumed)
             }
 
             available.y < 0 && state.enableLoadMore && state.footerHeight != 0f -> {
-                if (source == NestedScrollSource.Fling) {
-                    (available.y * state.stickinessLevel).coerceAtLeast(-state.flingIndicatorHeight(state.flingFooterIndicatorStrategy) - state.indicatorOffset)
+                val canConsumed = if (source == NestedScrollSource.Fling) {
+                    (available.y * state.stickinessLevel).coerceAtLeast(-state.strategyIndicatorHeight(state.flingFooterIndicatorStrategy) - state.indicatorOffset)
                 } else {
-                    // footer can drag any range
-                    available.y * state.stickinessLevel
+                    (available.y * state.stickinessLevel).coerceAtLeast(-state.strategyIndicatorHeight(state.dragFooterIndicatorStrategy) - state.indicatorOffset)
                 }
+                scroll(canConsumed)
             }
 
-            else -> 0f
+            else -> Offset.Zero
         }
-        coroutineScope.launch {
-            state.snapOffsetTo(state.indicatorOffset + canConsumed)
+    }
+
+    private fun scroll(canConsumed: Float): Offset {
+        return if (canConsumed.absoluteValue > 0.5f) {
+            coroutineScope.launch {
+                state.snapOffsetTo(state.indicatorOffset + canConsumed)
+            }
+            Offset(0f, canConsumed / state.stickinessLevel)
+        } else {
+            Offset.Zero
         }
-        return Offset(0f, canConsumed / state.stickinessLevel)
     }
 
     override suspend fun onPreFling(available: Velocity): Velocity {
