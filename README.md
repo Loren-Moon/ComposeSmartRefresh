@@ -1,16 +1,16 @@
 ## ComposeSmartRefresh
 UI参照SmartRefreshLayout仿写，基于compose实现。有下拉刷新&上拉加载功能(无需Paging3)，并且可设置拖动阈值以及自定义头尾布局。
 
-## 如何使用
 [详细介绍](https://juejin.cn/post/7113733273561333797)
 
+## 如何使用
 ```gradle
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation "io.github.loren-moon:composesmartrefresh:1.2.1"
+    implementation "io.github.loren-moon:composesmartrefresh:2.1.0"
 }
 ```
 
@@ -24,8 +24,6 @@ SmartSwipeRefresh(
         // loadMore
     },
     state = refreshState,
-    isNeedRefresh = true,
-    isNeedLoadMore = true,
     headerIndicator = {
         MyRefreshHeader(refreshState.refreshFlag, true)
     },
@@ -35,6 +33,16 @@ SmartSwipeRefresh(
     
 }
 ```
+
+刷新开关`enableRefresh`
+
+加载更多开关`enableLoadMore`
+
+粘性设置`stickLevel`
+
+滑动阈值设置`dragHeaderIndicatorStrategy`、`dragFooterIndicatorStrategy`、`flingHeaderIndicatorStrategy`、`flingFooterIndicatorStrategy`
+
+首次进入页面触发刷新动画自动加载数据`needFirstRefresh=true`
 
 ## :camera_flash: Screenshots
 
